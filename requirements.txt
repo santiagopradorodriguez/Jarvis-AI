@@ -1,0 +1,10 @@
+PyQt6
+faster-whisper
+google-generativeai
+requests
+PyMuPDF
+python-dotenv
+SpeechRecognition
+sounddevice
+numpy
+pygame

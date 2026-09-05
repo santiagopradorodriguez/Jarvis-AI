@@ -97,7 +97,7 @@ def handle_wake_and_auto_close(stream, close_recognizer):
             res = json.loads(close_recognizer.Result())
             words = res.get("text", "").lower().split()
             
-            if "enviar" in words:
+            if any(w in words for w in ["enviar", "cambio"]):
                 action = "send"
                 break
             elif "cancelar" in words:

@@ -4,7 +4,7 @@ import os
 import json
 import subprocess
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QActionGroup
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QCursor
 from PyQt5.QtCore import QTimer
 
 STATE_FILE = "/home/santiago/.gemini/config/tars_state.json"
@@ -73,12 +73,17 @@ class TarsTrayApp:
         self.create_menu()
         self.update_display(self.current_mode)
 
+        self.tray.activated.connect(self.on_tray_activated)
         self.tray.show()
 
         # Timer para sincronizar si el estado cambia por voz o F12
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_state_sync)
         self.timer.start(500)
+
+    def on_tray_activated(self, reason):
+        # Desplegar el menú selector directamente en la posición del cursor
+        self.menu.popup(QCursor.pos())
 
     def create_menu(self):
         self.menu = QMenu()
@@ -142,19 +147,6 @@ class TarsTrayApp:
         if disk_mode != self.current_mode:
             self.current_mode = disk_mode
             self.update_display(disk_mode)
-
-    def on_tray_activated(self, reason):
-        # Click izquierdo: alternar entre modos o abrir menú
-        if reason == QSystemTrayIcon.Trigger:
-            # Alternar cíclicamente entre auto -> button -> off -> auto
-            current = self.current_mode
-            if current == "auto":
-                nxt = "button"
-            elif current == "button":
-                nxt = "off"
-            else:
-                nxt = "auto"
-            self.switch_mode(nxt)
 
     def run(self):
         sys.exit(self.app.exec_())

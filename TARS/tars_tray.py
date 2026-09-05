@@ -48,21 +48,14 @@ def save_mode(mode):
     if mode == "auto":
         sound = START_CHIME
         msg = "🟢 Modo Escucha Automática"
-        subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif mode == "button":
         sound = END_CHIME
         msg = "🟡 Modo Solo Botón (Push-To-Talk)"
-        subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif mode == "off":
-        # Cortar inmediatamente cualquier reproducción de voz activa
+        # Cortar inmediatamente cualquier reproducción de voz activa de TARS
         stop_all_speech()
         sound = CANCEL_TONE
         msg = "🔴 TARS Apagado (Privacidad)"
-        # Silenciar micrófono
-        subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     os.system(f'notify-send "TARS" "{msg}" -t 2000')
 

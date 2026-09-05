@@ -9,21 +9,7 @@ LOCK_FILE = "/tmp/tars_speaking.lock"
 AUDIO_FILE = sys.argv[1] if len(sys.argv) > 1 else "/tmp/antigravity_response.mp3"
 CHIME_FILE = "/home/santiago/.gemini/config/gemini_chime.wav"
 
-def mute_mic(mute=True):
-    val = "1" if mute else "0"
-    try:
-        subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", val],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
-    try:
-        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", val],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
-
 def cleanup(signum=None, frame=None):
-    mute_mic(False)
     if os.path.exists(LOCK_FILE):
         try:
             os.remove(LOCK_FILE)
@@ -39,8 +25,6 @@ def main():
     try:
         with open(LOCK_FILE, "w") as f:
             f.write(str(os.getpid()))
-            
-        mute_mic(True)
         
         # Only play chime if it's the main antigravity response
         if "antigravity_response" in AUDIO_FILE and os.path.exists(CHIME_FILE):

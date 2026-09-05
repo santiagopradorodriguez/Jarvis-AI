@@ -81,8 +81,6 @@ def stop_all_speech():
             os.remove(SPEAKING_LOCK)
     except Exception:
         pass
-    subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def trigger_short_action():
     # Detener inmediatamente cualquier reproducción de voz

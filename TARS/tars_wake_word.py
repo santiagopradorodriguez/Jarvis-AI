@@ -69,8 +69,6 @@ def stop_all_speech():
             os.remove(LOCK_FILE)
     except Exception:
         pass
-    subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def handle_wake_and_auto_close(stream, close_recognizer):
     stop_all_speech()

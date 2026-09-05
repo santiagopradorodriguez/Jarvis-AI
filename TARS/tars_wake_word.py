@@ -31,6 +31,16 @@ def get_mode():
 def set_mode(mode):
     with open(STATE_FILE, "w") as f:
         json.dump({"mode": mode}, f)
+        
+    msg = ""
+    if mode == "auto":
+        msg = "🟢 Modo Escucha Automática"
+    elif mode == "button":
+        msg = "🟡 Modo Solo Botón (Push-To-Talk)"
+    elif mode == "off":
+        msg = "🔴 TARS Apagado (Privacidad)"
+    
+    os.system(f'notify-send "TARS" "{msg}" -t 2000')
 
 def send_ctrl_m():
     controller = keyboard.Controller()
@@ -49,15 +59,21 @@ def send_enter():
     time.sleep(0.05)
     controller.release(keyboard.Key.enter)
 
+def stop_all_speech():
+    subprocess.run(["pkill", "-9", "-f", "paplay.*antigravity_response"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-9", "-f", "paplay.*wa_msg"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-9", "-f", "ffplay.*antigravity_response"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-9", "-f", "tars_player.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+    except Exception:
+        pass
+    subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 def handle_wake_and_auto_close(stream, close_recognizer):
-    subprocess.run(["pkill", "-9", "-f", "ffplay.*antigravity_response"], 
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                   
-    # Force un-mute mic
-    subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], 
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], 
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    stop_all_speech()
     
     if os.path.exists(START_CHIME):
         subprocess.Popen(["paplay", START_CHIME], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -92,6 +108,9 @@ def handle_wake_and_auto_close(stream, close_recognizer):
             elif "apagado" in words or "apagar" in words:
                 action = "off"
                 break
+            elif "botón" in words or "tecla" in words:
+                action = "button"
+                break
                 
         if now - start_time > 120.0:
             action = "timeout"
@@ -114,6 +133,11 @@ def handle_wake_and_auto_close(stream, close_recognizer):
             subprocess.Popen(["paplay", CANCEL_TONE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         set_mode("off")
         print("TARS apagado por comando de voz.")
+    elif action == "button":
+        if os.path.exists(CANCEL_TONE):
+            subprocess.Popen(["paplay", CANCEL_TONE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        set_mode("button")
+        print("TARS pasado a modo botón por voz.")
 
 def main():
     vosk.SetLogLevel(-1)
@@ -124,9 +148,9 @@ def main():
     wake_grammar = '["hola tas", "hola tarso", "hola tarde", "hola", "[unk]"]'
     wake_recognizer = vosk.KaldiRecognizer(model, 16000, wake_grammar)
     
-    # "enviar" para mandar, "apagado" para apagar, "cancelar" para abortar dictado
-    close_grammar = '["enviar", "apagado", "apagar", "cancelar", "[unk]"]'
-    close_recognizer = vosk.KaldiRecognizer(model, 16000, close_grammar)
+    # Quitar la gramática restrictiva. Usar el vocabulario completo de Vosk.
+    # Así evitamos que cualquier ruido se fuerce a ser "enviar" o "cancelar".
+    close_recognizer = vosk.KaldiRecognizer(model, 16000)
 
     with sd.RawInputStream(samplerate=16000, blocksize=4000, dtype='int16', channels=1) as stream:
         last_check = 0

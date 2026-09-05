@@ -34,6 +34,16 @@ def get_mode():
 def set_mode(mode):
     with open(STATE_FILE, "w") as f:
         json.dump({"mode": mode}, f)
+    
+    msg = ""
+    if mode == "auto":
+        msg = "🟢 Modo Escucha Automática"
+    elif mode == "button":
+        msg = "🟡 Modo Solo Botón (Push-To-Talk)"
+    elif mode == "off":
+        msg = "🔴 TARS Apagado (Privacidad)"
+    
+    os.system(f'notify-send "TARS" "{msg}" -t 2000')
 
 key_pressed_time = None
 long_press_triggered = False
@@ -61,8 +71,9 @@ def send_enter():
     time.sleep(0.05)
     controller.release(keyboard.Key.enter)
 
-def trigger_short_action():
-    # Stop assistant speech instantly
+def stop_all_speech():
+    subprocess.run(["pkill", "-9", "-f", "paplay.*antigravity_response"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-9", "-f", "paplay.*wa_msg"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["pkill", "-9", "-f", "ffplay.*antigravity_response"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["pkill", "-9", "-f", "tars_player.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
@@ -72,6 +83,10 @@ def trigger_short_action():
         pass
     subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def trigger_short_action():
+    # Detener inmediatamente cualquier reproducción de voz
+    stop_all_speech()
     
     # Check if we were dictating
     if os.path.exists(DICTATING_LOCK):
@@ -97,17 +112,12 @@ def trigger_short_action():
         send_ctrl_m()
 
 def trigger_killswitch():
-    subprocess.run(["pkill", "-9", "-f", "ffplay.*antigravity_response"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["pkill", "-9", "-f", "tars_player.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    stop_all_speech()
     try:
-        if os.path.exists(SPEAKING_LOCK):
-            os.remove(SPEAKING_LOCK)
         if os.path.exists(DICTATING_LOCK):
             os.remove(DICTATING_LOCK)
     except Exception:
         pass
-    subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     set_mode("off")
     play_sound(CANCEL_TONE)

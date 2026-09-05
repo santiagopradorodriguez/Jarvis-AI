@@ -137,6 +137,18 @@ def main():
         if not input_data:
             print("{}")
             return
+
+        # Si TARS está apagado (Modo Rojo), no hablar
+        state_file = "/home/santiago/.gemini/config/tars_state.json"
+        try:
+            if os.path.exists(state_file):
+                with open(state_file, "r") as sf:
+                    sdata = json.load(sf)
+                    if sdata.get("mode") == "off":
+                        print("{}")
+                        return
+        except Exception:
+            pass
             
         payload = json.loads(input_data)
         transcript_path = payload.get("transcriptPath")

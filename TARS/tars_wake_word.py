@@ -163,10 +163,19 @@ def main():
                 last_check = now
                 
             if current_mode != "auto":
-                time.sleep(0.5)
+                try:
+                    data, _ = stream.read(4000)
+                except Exception:
+                    pass
+                wake_recognizer.Reset()
+                time.sleep(0.1)
                 continue
                 
             if os.path.exists(LOCK_FILE):
+                try:
+                    data, _ = stream.read(4000)
+                except Exception:
+                    pass
                 time.sleep(0.15)
                 wake_recognizer.Reset()
                 continue

@@ -80,6 +80,17 @@ def main():
                 strings = []
 
 def process_notification(call_lines, strings):
+    # Si TARS está en modo apagado (Rojo), silencio absoluto
+    try:
+        state_f = "/home/santiago/.gemini/config/tars_state.json"
+        if os.path.exists(state_f):
+            import json
+            with open(state_f, "r") as sf:
+                if json.load(sf).get("mode") == "off":
+                    return
+    except Exception:
+        pass
+
     full_text = "\n".join(call_lines)
     # Detectar si la notificación proviene de ZapZap o WhatsApp en cualquier campo
     is_zapzap = bool(re.search(r'(?:ZapZap|zapzap|com\.rtosta\.zapzap|WhatsApp)', full_text, re.IGNORECASE))

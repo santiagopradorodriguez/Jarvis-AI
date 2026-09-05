@@ -177,9 +177,15 @@ def main():
                 subprocess.run(["pkill", "-9", "-f", "tars_player.py"], 
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 asyncio.run(generate_speech(clean))
+                
+                # Convertir a WAV para usar paplay que es mucho más estable que ffplay
+                wav_file = OUTPUT_FILE.replace(".mp3", ".wav")
+                subprocess.run(["ffmpeg", "-y", "-i", OUTPUT_FILE, wav_file], 
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                               
                 # Launch tars_player to mute mic, play chime, speak, and unmute mic
                 subprocess.Popen(["/home/santiago/.gemini/tts_venv/bin/python", 
-                                  "/home/santiago/.gemini/config/tars_player.py"], 
+                                  "/home/santiago/.gemini/config/tars_player.py", wav_file], 
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, 
                                  start_new_session=True)
     except Exception:

@@ -22,8 +22,11 @@ def announce_sender(sender_name):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         if os.path.exists(audio_file):
+            wav_file = audio_file.replace(".mp3", ".wav")
+            subprocess.run(["ffmpeg", "-y", "-i", audio_file, wav_file], 
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Reproducir usando tars_player (que silencia el mic para no auto-escucharse)
-            subprocess.run([PYTHON_BIN, TARS_PLAYER, audio_file], 
+            subprocess.run([PYTHON_BIN, TARS_PLAYER, wav_file], 
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
         print(f"Error reproduciendo TTS: {e}")

@@ -43,7 +43,7 @@ def main():
         mute_mic(True)
         
         # Only play chime if it's the main antigravity response
-        if AUDIO_FILE == "/tmp/antigravity_response.mp3" and os.path.exists(CHIME_FILE):
+        if "antigravity_response" in AUDIO_FILE and os.path.exists(CHIME_FILE):
             subprocess.run(["paplay", CHIME_FILE],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(0.1)
@@ -57,7 +57,7 @@ def main():
                 subprocess.run(["ffplay", "-nodisp", "-autoexit", AUDIO_FILE],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-        if AUDIO_FILE == "/tmp/antigravity_response.mp3":
+        if "antigravity_response" in AUDIO_FILE:
             turn_cue = "/home/santiago/.gemini/config/tars_your_turn.wav"
             if os.path.exists(turn_cue):
                 subprocess.run(["paplay", turn_cue],

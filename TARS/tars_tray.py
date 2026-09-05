@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
+import sys
 import os
 import json
-import time
 import subprocess
-import threading
-from PIL import Image
-import pystray
-from pystray import MenuItem as item
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QActionGroup
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QTimer
 
 STATE_FILE = "/home/santiago/.gemini/config/tars_state.json"
 ICON_GREEN = "/home/santiago/.gemini/config/tars_green.png"
@@ -22,121 +21,130 @@ def get_mode():
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r") as f:
                 data = json.load(f)
-                if "mode" in data:
-                    return data["mode"]
-                # Fallback for old state
-                return "auto" if data.get("enabled", True) else "off"
+                return data.get("mode", "auto")
     except Exception:
         pass
     return "auto"
 
-def set_mode(mode):
+def save_mode(mode):
     with open(STATE_FILE, "w") as f:
         json.dump({"mode": mode}, f)
-    
-    # Audio cue when toggled
+        
     sound = None
+    msg = ""
     if mode == "auto":
         sound = START_CHIME
+        msg = "🟢 Modo Escucha Automática"
     elif mode == "button":
         sound = END_CHIME
+        msg = "🟡 Modo Solo Botón (Push-To-Talk)"
     elif mode == "off":
         sound = CANCEL_TONE
-        
+        msg = "🔴 TARS Apagado (Privacidad)"
+
+    os.system(f'notify-send "TARS" "{msg}" -t 2000')
+
     if sound and os.path.exists(sound):
         subprocess.Popen(["paplay", sound], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def cycle_mode(icon, item=None):
-    current = get_mode()
-    if current == "auto":
-        new_mode = "button"
-    elif current == "button":
-        new_mode = "off"
-    else:
-        new_mode = "auto"
-    
-    set_mode(new_mode)
-    update_icon(icon)
+class TarsTrayApp:
+    def __init__(self):
+        self.app = QApplication(sys.argv)
+        self.app.setQuitOnLastWindowClosed(False)
 
-def set_mode_auto(icon, item=None):
-    set_mode("auto")
-    update_icon(icon)
+        self.tray = QSystemTrayIcon()
+        self.current_mode = get_mode()
 
-def set_mode_button(icon, item=None):
-    set_mode("button")
-    update_icon(icon)
+        self.create_menu()
+        self.update_display(self.current_mode)
 
-def set_mode_off(icon, item=None):
-    set_mode("off")
-    update_icon(icon)
+        self.tray.activated.connect(self.on_tray_activated)
+        self.tray.show()
 
-def update_icon(icon):
-    mode = get_mode()
-    if mode == "auto":
-        icon_path = ICON_GREEN
-        icon.title = "TARS: Escucha Automática (Hola TARS + botón)"
-    elif mode == "button":
-        icon_path = ICON_YELLOW
-        icon.title = "TARS: Modo Manual (Solo botón)"
-    else:
-        icon_path = ICON_RED
-        icon.title = "TARS: Apagado (Privacidad total)"
-        
-    if os.path.exists(icon_path):
-        icon.icon = Image.open(icon_path)
-    
-    icon.menu = get_menu()
+        # Timer para sincronizar si el estado cambia por voz o F12
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_state_sync)
+        self.timer.start(500)
 
-def exit_tray(icon, item=None):
-    icon.stop()
+    def create_menu(self):
+        self.menu = QMenu()
 
-def get_menu():
-    mode = get_mode()
-    return pystray.Menu(
-        item(f"Estado actual: {mode.upper()}", None, enabled=False),
-        pystray.Menu.SEPARATOR,
-        item("🟢 Modo Escucha Automática (Manos Libres)", set_mode_auto, checked=lambda item: mode == "auto", radio=True),
-        item("🟡 Modo Solo Botón (Push-to-Talk)", set_mode_button, checked=lambda item: mode == "button", radio=True),
-        item("🔴 Apagar TARS", set_mode_off, checked=lambda item: mode == "off", radio=True),
-        pystray.Menu.SEPARATOR,
-        item("Salir", exit_tray)
-    )
+        self.header_action = QAction("Estado: " + self.current_mode.upper(), self.menu)
+        self.header_action.setEnabled(False)
+        self.menu.addAction(self.header_action)
+        self.menu.addSeparator()
 
-def state_watcher(icon):
-    last_mode = get_mode()
-    while True:
-        time.sleep(0.5)
-        curr = get_mode()
-        if curr != last_mode:
-            last_mode = curr
-            update_icon(icon)
+        self.group = QActionGroup(self.menu)
 
-def main():
-    initial_mode = get_mode()
-    
-    if initial_mode == "auto":
-        img_path = ICON_GREEN
-    elif initial_mode == "button":
-        img_path = ICON_YELLOW
-    else:
-        img_path = ICON_RED
-        
-    # Create fallback image if files don't exist yet
-    if os.path.exists(img_path):
-        img = Image.open(img_path)
-    else:
-        img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
-    
-    icon = pystray.Icon(
-        name="TARS",
-        icon=img,
-        title="TARS",
-        menu=get_menu()
-    )
-    
-    icon.on_activate = cycle_mode
-    threading.Thread(target=state_watcher, args=(icon,), daemon=True).start()
-    icon.run()
+        self.action_auto = QAction("🟢 Modo Automático (Hola TARS)", self.menu, checkable=True)
+        self.action_auto.triggered.connect(lambda: self.switch_mode("auto"))
+        self.group.addAction(self.action_auto)
+        self.menu.addAction(self.action_auto)
+
+        self.action_button = QAction("🟡 Modo Solo Botón (F12)", self.menu, checkable=True)
+        self.action_button.triggered.connect(lambda: self.switch_mode("button"))
+        self.group.addAction(self.action_button)
+        self.menu.addAction(self.action_button)
+
+        self.action_off = QAction("🔴 Apagar TARS (Desactivado)", self.menu, checkable=True)
+        self.action_off.triggered.connect(lambda: self.switch_mode("off"))
+        self.group.addAction(self.action_off)
+        self.menu.addAction(self.action_off)
+
+        self.menu.addSeparator()
+        self.action_exit = QAction("Salir", self.menu)
+        self.action_exit.triggered.connect(self.app.quit)
+        self.menu.addAction(self.action_exit)
+
+        self.tray.setContextMenu(self.menu)
+
+    def switch_mode(self, new_mode):
+        if self.current_mode != new_mode:
+            self.current_mode = new_mode
+            save_mode(new_mode)
+            self.update_display(new_mode)
+
+    def update_display(self, mode):
+        self.header_action.setText(f"Estado: {mode.upper()}")
+        if mode == "auto":
+            icon_path = ICON_GREEN
+            tooltip = "TARS: Escucha Automática (Hola TARS)"
+            self.action_auto.setChecked(True)
+        elif mode == "button":
+            icon_path = ICON_YELLOW
+            tooltip = "TARS: Modo Solo Tecla (F12)"
+            self.action_button.setChecked(True)
+        else:
+            icon_path = ICON_RED
+            tooltip = "TARS: Apagado (Micrófono cerrado)"
+            self.action_off.setChecked(True)
+
+        if os.path.exists(icon_path):
+            self.tray.setIcon(QIcon(icon_path))
+        self.tray.setToolTip(tooltip)
+
+    def check_state_sync(self):
+        disk_mode = get_mode()
+        if disk_mode != self.current_mode:
+            self.current_mode = disk_mode
+            self.update_display(disk_mode)
+
+    def on_tray_activated(self, reason):
+        # Click izquierdo: alternar entre modos o abrir menú
+        if reason == QSystemTrayIcon.Trigger:
+            # Alternar cíclicamente entre auto -> button -> off -> auto
+            current = self.current_mode
+            if current == "auto":
+                nxt = "button"
+            elif current == "button":
+                nxt = "off"
+            else:
+                nxt = "auto"
+            self.switch_mode(nxt)
+
+    def run(self):
+        sys.exit(self.app.exec_())
 
 if __name__ == "__main__":
-    main()
+    app = TarsTrayApp()
+    app.run()

@@ -4,7 +4,10 @@ import os
 import re
 import time
 import asyncio
+import sys
+sys.path.append("/home/santiago/.gemini/config")
 import edge_tts
+from tars_voice_engine import synthesize_speech, get_voice
 
 PYTHON_BIN = "/home/santiago/.gemini/tts_venv/bin/python"
 TARS_PLAYER = "/home/santiago/.gemini/config/tars_player.py"
@@ -29,21 +32,38 @@ def announce_message(sender_name):
     wav_file = "/tmp/wa_msg.wav"
 
     try:
-        # Generar TTS directo en memoria
-        asyncio.run(generate_speech(text, mp3_file))
-        if os.path.exists(mp3_file):
-            subprocess.run(["ffmpeg", "-y", "-i", mp3_file, wav_file],
+        # Sintetizar usando el motor dual (Puck o Edge-TTS según selección)
+        success = synthesize_speech(text, wav_file)
+        if success and os.path.exists(wav_file):
+            subprocess.run([PYTHON_BIN, TARS_PLAYER, wav_file],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if os.path.exists(wav_file):
-                subprocess.run([PYTHON_BIN, TARS_PLAYER, wav_file],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return
+            return
     except Exception as e:
-        print(f"Error en TTS de WhatsApp: {e}", flush=True)
+        print(f"Error en TTS dual de WhatsApp: {e}", flush=True)
+        try:
+            asyncio.run(generate_speech(text, mp3_file))
+            if os.path.exists(mp3_file):
+                subprocess.run(["ffmpeg", "-y", "-i", mp3_file, wav_file],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if os.path.exists(wav_file):
+                    subprocess.run([PYTHON_BIN, TARS_PLAYER, wav_file],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+        except Exception:
+            pass
 
-    # Fallback si no hay internet o falla Edge-TTS: reproducir sonido base
-    if os.path.exists(DEFAULT_SOUND):
-        subprocess.run([PYTHON_BIN, TARS_PLAYER, DEFAULT_SOUND],
+    # Fallback si falla todo: reproducir sonido base según la voz activa
+    fallback_sound = DEFAULT_SOUND
+    try:
+        if get_voice() == "puck":
+            puck_sound = "/home/santiago/.gemini/config/cues_puck/tenes_un_mensaje_de_whatsapp.wav"
+            if os.path.exists(puck_sound):
+                fallback_sound = puck_sound
+    except Exception:
+        pass
+
+    if os.path.exists(fallback_sound):
+        subprocess.run([PYTHON_BIN, TARS_PLAYER, fallback_sound],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def main():

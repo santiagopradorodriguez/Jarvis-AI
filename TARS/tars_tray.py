@@ -16,6 +16,31 @@ START_CHIME = "/home/santiago/.gemini/config/tars_record_start.wav"
 END_CHIME = "/home/santiago/.gemini/config/tars_record_end.wav"
 CANCEL_TONE = "/home/santiago/.gemini/config/tars_cancel_tone.wav"
 
+
+def get_voice():
+    try:
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("voice", "edge")
+    except Exception:
+        pass
+    return "edge"
+
+def save_voice(voice):
+    try:
+        data = {}
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, "r") as f:
+                data = json.load(f)
+        data["voice"] = voice
+        with open(STATE_FILE, "w") as f:
+            json.dump(data, f)
+        msg = "Voz Clásica (Tomás)" if voice == "edge" else "Voz Neuronal (Puck)"
+        os.system(f'notify-send "TARS" "Voz seleccionada: {msg}" -t 2000')
+    except Exception:
+        pass
+
 def get_mode():
     try:
         if os.path.exists(STATE_FILE):
@@ -69,6 +94,7 @@ class TarsTrayApp:
 
         self.tray = QSystemTrayIcon()
         self.current_mode = get_mode()
+        self.current_voice = get_voice()
 
         self.create_menu()
         self.update_display(self.current_mode)
@@ -111,11 +137,41 @@ class TarsTrayApp:
         self.menu.addAction(self.action_off)
 
         self.menu.addSeparator()
+
+        # Submenú de Selección de Voz
+        self.voice_menu = self.menu.addMenu("🎙️ Voz de TARS")
+        self.voice_group = QActionGroup(self.voice_menu)
+
+        self.action_voice_edge = QAction("Clásica (Tomás / Edge)", self.voice_menu, checkable=True)
+        self.action_voice_edge.triggered.connect(lambda: self.switch_voice("edge"))
+        self.voice_group.addAction(self.action_voice_edge)
+        self.voice_menu.addAction(self.action_voice_edge)
+
+        self.action_voice_puck = QAction("Neuronal (Puck / Gemini)", self.voice_menu, checkable=True)
+        self.action_voice_puck.triggered.connect(lambda: self.switch_voice("puck"))
+        self.voice_group.addAction(self.action_voice_puck)
+        self.voice_menu.addAction(self.action_voice_puck)
+
+        self.update_voice_display(self.current_voice)
+
+        self.menu.addSeparator()
         self.action_exit = QAction("Salir", self.menu)
         self.action_exit.triggered.connect(self.app.quit)
         self.menu.addAction(self.action_exit)
 
         self.tray.setContextMenu(self.menu)
+
+    def switch_voice(self, new_voice):
+        if self.current_voice != new_voice:
+            self.current_voice = new_voice
+            save_voice(new_voice)
+            self.update_voice_display(new_voice)
+
+    def update_voice_display(self, voice):
+        if voice == "puck":
+            self.action_voice_puck.setChecked(True)
+        else:
+            self.action_voice_edge.setChecked(True)
 
     def switch_mode(self, new_mode):
         if self.current_mode != new_mode:
@@ -147,6 +203,11 @@ class TarsTrayApp:
         if disk_mode != self.current_mode:
             self.current_mode = disk_mode
             self.update_display(disk_mode)
+
+        disk_voice = get_voice()
+        if disk_voice != self.current_voice:
+            self.current_voice = disk_voice
+            self.update_voice_display(disk_voice)
 
     def run(self):
         sys.exit(self.app.exec_())

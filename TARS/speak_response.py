@@ -7,6 +7,7 @@ import subprocess
 import asyncio
 import certifi
 import edge_tts
+sys.path.append("/home/santiago/.gemini/config")
 os.environ["SSL_CERT_FILE"] = certifi.where()
 
 VOICE = "es-AR-TomasNeural"
@@ -188,12 +189,15 @@ def main():
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["pkill", "-9", "-f", "tars_player.py"], 
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                asyncio.run(generate_speech(clean))
-                
-                # Convertir a WAV para usar paplay que es mucho más estable que ffplay
+                # Sintetizar usando el motor dual (Puck o Edge-TTS según selección)
                 wav_file = OUTPUT_FILE.replace(".mp3", ".wav")
-                subprocess.run(["ffmpeg", "-y", "-i", OUTPUT_FILE, wav_file], 
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    from tars_voice_engine import synthesize_speech
+                    synthesize_speech(clean, wav_file)
+                except Exception:
+                    asyncio.run(generate_speech(clean))
+                    subprocess.run(["ffmpeg", "-y", "-i", OUTPUT_FILE, wav_file], 
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                                
                 # Launch tars_player to mute mic, play chime, speak, and unmute mic
                 subprocess.Popen(["/home/santiago/.gemini/tts_venv/bin/python", 

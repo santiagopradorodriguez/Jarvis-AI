@@ -87,6 +87,9 @@ async def _synthesize_puck_async(text, output_wav):
                                 "voiceName": "Puck"
                             }
                         }
+                    },
+                    "thinkingConfig": {
+                        "thinkingBudget": 0
                     }
                 },
                 "systemInstruction": {
@@ -138,7 +141,7 @@ async def _synthesize_puck_async(text, output_wav):
 
 def synthesize_puck(text, output_wav):
     try:
-        return asyncio.run(asyncio.wait_for(_synthesize_puck_async(text, output_wav), timeout=8.0))
+        return asyncio.run(asyncio.wait_for(_synthesize_puck_async(text, output_wav), timeout=25.0))
     except Exception as e:
         print(f"Fallo síntesis Puck ({e}). Usando fallback Edge-TTS.", file=sys.stderr)
         return False
